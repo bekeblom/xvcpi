@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <errno.h>
 #include "xvcpi.h"
 
 // https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#peripheral-addresses
@@ -300,6 +301,8 @@ int main(int argc, char **argv) {
    int s;
    int c;
    int port = 2542;
+   errno = 0;
+   long conv;
 
    struct sockaddr_in address;
 
@@ -319,7 +322,7 @@ int main(int argc, char **argv) {
       conv = strtol(optarg, &p, 10);
       // Check for errors: e.g., the string does not represent an integer
       // or the integer is larger than int
-      if (errno != 0 || *p != '\0' || conv > MAX_PORT || conv <= 0) {
+      if (errno != 0 || *p != '\0' || conv > 65535 || conv <= 0) {
         fprintf(stderr, "Invalid port (must be between 1 and 65535): %s\n", optarg);
         return 1;
       } else {
