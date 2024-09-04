@@ -47,10 +47,10 @@ static void     bcm2835gpio_write(int tck, int tms, int tdi);
 static uint32_t bcm2835gpio_xfer(int n, uint32_t tms, uint32_t tdi);
 
 /* GPIO numbers for each signal. Negative values are invalid */
-static int tck_gpio = 11;
-static int tms_gpio = 25;
-static int tdi_gpio = 10;
-static int tdo_gpio = 9;
+/* static int tck_gpio = 11; */
+/* static int tms_gpio = 25; */
+/* static int tdi_gpio = 10; */
+/* static int tdo_gpio = 9; */
 
 static int verbose = 0;
 
