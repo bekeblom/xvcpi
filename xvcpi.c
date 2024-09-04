@@ -299,6 +299,7 @@ int main(int argc, char **argv) {
    int i;
    int s;
    int c;
+   int port = 2542;
 
    struct sockaddr_in address;
 
@@ -314,6 +315,17 @@ int main(int argc, char **argv) {
          if (jtag_delay < 0)
              jtag_delay = JTAG_DELAY;
          break;
+    case 'p':
+      conv = strtol(optarg, &p, 10);
+      // Check for errors: e.g., the string does not represent an integer
+      // or the integer is larger than int
+      if (errno != 0 || *p != '\0' || conv > MAX_PORT || conv <= 0) {
+        fprintf(stderr, "Invalid port (must be between 1 and 65535): %s\n", optarg);
+        return 1;
+      } else {
+        port = (int)conv;
+      }
+      break;
       case '?':
          fprintf(stderr, "usage: %s [-v]\n", *argv);
          return 1;
@@ -338,7 +350,7 @@ int main(int argc, char **argv) {
    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i);
 
    address.sin_addr.s_addr = INADDR_ANY;
-   address.sin_port = htons(2542);
+   address.sin_port = htons(port);
    address.sin_family = AF_INET;
 
    if (bind(s, (struct sockaddr*) &address, sizeof(address)) < 0) {
@@ -350,6 +362,8 @@ int main(int argc, char **argv) {
       perror("listen");
       return 1;
    }
+
+   printf("Listening on port %d\n", port);
 
    fd_set conn;
    int maxfd = 0;
