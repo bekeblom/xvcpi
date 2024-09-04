@@ -301,6 +301,7 @@ int main(int argc, char **argv) {
    int s;
    int c;
    int port = 2542;
+   char *p;
    errno = 0;
    long conv;
 
