@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include "xvcpi.h"
 
 // https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#peripheral-addresses
 #define DO_PADS
@@ -67,11 +68,13 @@ static void bcm2835gpio_write(int tck, int tms, int tdi)
    uint32_t set = tck<<tck_gpio | tms<<tms_gpio | tdi<<tdi_gpio;
    uint32_t clear = !tck<<tck_gpio | !tms<<tms_gpio | !tdi<<tdi_gpio;
 
-   GPIO_SET = set;
+   GPIO_SET = set | 1 << led;
+   //GPIO_SET = set;
    GPIO_CLR = clear;
 
    for (unsigned int i = 0; i < jtag_delay; i++)
       asm volatile ("");
+   GPIO_CLR = clear | 1 << led;
 }
 
 static uint32_t bcm2835gpio_xfer(int n, uint32_t tms, uint32_t tdi)
@@ -141,7 +144,7 @@ static bool bcm2835gpio_init(void)
    OUT_GPIO(tdi_gpio);
    OUT_GPIO(tck_gpio);
    OUT_GPIO(tms_gpio);
-
+   OUT_GPIO(led);
    bcm2835gpio_write(0, 1, 0);
 
    return true;
