@@ -64,6 +64,13 @@ static int bcm2835gpio_read(void)
    return !!(GPIO_LEV & 1<<tdo_gpio);
 }
 
+
+static int vtarget_in_gpio_read(void)
+{
+  return !!(GPIO_LEV & 1<<vtarget_in_gpio);
+}
+
+
 static void bcm2835gpio_write(int tck, int tms, int tdi)
 {
    uint32_t set = tck<<tck_gpio | tms<<tms_gpio | tdi<<tdi_gpio;
@@ -91,6 +98,17 @@ static uint32_t bcm2835gpio_xfer(int n, uint32_t tms, uint32_t tdi)
    }
    return tdo;
 }
+
+
+static uint32_t read_vtarget_in()
+{
+  uint32_t vtarget_in = 0;
+  vtarget_in = vtarget_in_gpio_read();
+//  printf("VTARGET : 0x%08x\n", vtarget_in_gpio_read());
+
+   return (vtarget_in);
+}
+
 
 static bool bcm2835gpio_init(void)
 {
@@ -134,10 +152,11 @@ static bool bcm2835gpio_init(void)
 #endif
 
    /*
-    * Configure TDO as an input, and TDI, TCK, TMS
+    * Configure TDO and Resets as inputs, and TDI, TCK, TMS
     * as outputs.  Drive TDI and TCK low, and TMS high.
     */
    INP_GPIO(tdo_gpio);
+   INP_GPIO(vtarget_in_gpio);
 
    GPIO_CLR = 1<<tdi_gpio | 1<<tck_gpio;
    GPIO_SET = 1<<tms_gpio;
@@ -263,6 +282,7 @@ int handle_data(int fd) {
                printf("TMS : 0x%08x\n", tms);
                printf("TDI : 0x%08x\n", tdi);
                printf("TDO : 0x%08x\n", tdo);
+               printf("VTARGET : 0x%08x\n", read_vtarget_in());
             }
 
          } else {
@@ -279,6 +299,7 @@ int handle_data(int fd) {
                printf("TMS : 0x%08x\n", tms);
                printf("TDI : 0x%08x\n", tdi);
                printf("TDO : 0x%08x\n", tdo);
+               printf("VTARGET : 0x%08x\n", read_vtarget_in());
             }
             break;
          }
@@ -290,35 +311,35 @@ int handle_data(int fd) {
          perror("write");
          return 1;
       }
-
-   } while (1);
+//      printf("VTARGET : 0x%08x\n", read_vtarget_in());
+   } while (read_vtarget_in() > 0); //while (1);
    /* Note: Need to fix JTAG state updates, until then no exit is allowed */
    return 0;
 }
 
 int main(int argc, char **argv) {
-   int i;
-   int s;
-   int c;
-   int port = 2542;
-   char *p;
-   errno = 0;
-   long conv;
+  int i;
+  int s;
+  int c;
+  int port = 2542;
+  char *p;
+  errno = 0;
+  long conv;
 
-   struct sockaddr_in address;
+  struct sockaddr_in address;
 
-   opterr = 0;
+  opterr = 0;
 
-   while ((c = getopt(argc, argv, "vd:")) != -1) {
-      switch (c) {
-      case 'v':
-         verbose = 1;
-         break;
-      case 'd':
-         jtag_delay = atoi(optarg);
-         if (jtag_delay < 0)
-             jtag_delay = JTAG_DELAY;
-         break;
+  while ((c = getopt(argc, argv, "vd:")) != -1) {
+    switch (c) {
+    case 'v':
+      verbose = 1;
+      break;
+    case 'd':
+      jtag_delay = atoi(optarg);
+      if (jtag_delay < 0)
+        jtag_delay = JTAG_DELAY;
+      break;
     case 'p':
       conv = strtol(optarg, &p, 10);
       // Check for errors: e.g., the string does not represent an integer
@@ -330,122 +351,134 @@ int main(int argc, char **argv) {
         port = (int)conv;
       }
       break;
-      case '?':
-         fprintf(stderr, "usage: %s [-v]\n", *argv);
-         return 1;
-      }
-   }
-   if (verbose)
+    case '?':
+      fprintf(stderr, "usage: %s [-v]\n", *argv);
+      return 1;
+    }
+  }
+  while (1) {
+//    while (read_vtarget_in()<1){sleep(0);};
+    if (verbose)
       printf("jtag_delay=%d\n", jtag_delay);
 
-   if (!bcm2835gpio_init()) {
+    if (!bcm2835gpio_init()) {
       fprintf(stderr,"Failed in bcm2835gpio_init()\n");
       return -1;
-   }
+    }
 
-   s = socket(AF_INET, SOCK_STREAM, 0);
+    s = socket(AF_INET, SOCK_STREAM, 0);
 
-   if (s < 0) {
+    if (s < 0) {
       perror("socket");
       return 1;
-   }
+    }
 
-   i = 1;
-   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i);
+    i = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &i, sizeof i);
 
-   address.sin_addr.s_addr = INADDR_ANY;
-   address.sin_port = htons(port);
-   address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+    address.sin_family = AF_INET;
 
-   if (bind(s, (struct sockaddr*) &address, sizeof(address)) < 0) {
+    if (bind(s, (struct sockaddr*) &address, sizeof(address)) < 0) {
       perror("bind");
       return 1;
-   }
+    }
 
-   if (listen(s, 0) < 0) {
+    if (listen(s, 0) < 0) {
       perror("listen");
       return 1;
-   }
+    }
 
-   printf("Listening on port %d\n", port);
+    printf("Listening on port %d\n", port);
 
-   fd_set conn;
-   int maxfd = 0;
+    fd_set conn;
+    int maxfd = 0;
 
-   FD_ZERO(&conn);
-   FD_SET(s, &conn);
+    FD_ZERO(&conn);
+    FD_SET(s, &conn);
 
-   maxfd = s;
+    maxfd = s;
+    read_vtarget_in();
 
-   while (1) {
+    while (read_vtarget_in()<1){
+	sleep(1);
+	printf("VTARGET : 0x%08x\n", read_vtarget_in());
+	}
+
+
+    while (read_vtarget_in()) {
+//     printf("VTARGET : 0x%08x\n", read_vtarget_in());
       fd_set read = conn, except = conn;
       int fd;
 
       if (select(maxfd + 1, &read, 0, &except, 0) < 0) {
-         perror("select");
-         break;
+        perror("select");
+        break;
       }
 
       for (fd = 0; fd <= maxfd; ++fd) {
-         if (FD_ISSET(fd, &read)) {
-            if (fd == s) {
-               int newfd;
-               socklen_t nsize = sizeof(address);
+        if (FD_ISSET(fd, &read)) {
+          if (fd == s) {
+            int newfd;
+            socklen_t nsize = sizeof(address);
 
-               newfd = accept(s, (struct sockaddr*) &address, &nsize);
+            newfd = accept(s, (struct sockaddr*) &address, &nsize);
 
-               if (verbose)
-                  printf("connection accepted - fd %d\n", newfd);
-               if (newfd < 0) {
-                  perror("accept");
-               } else {
-                 int flag = 1;
-                 int optResult = setsockopt(newfd,
-                                               IPPROTO_TCP,
-                                               TCP_NODELAY,
-                                               (char *)&flag,
-                                               sizeof(int));
-                 if (optResult < 0)
-                    perror("TCP_NODELAY error");
-                  if (newfd > maxfd) {
-                     maxfd = newfd;
-                  }
-                  FD_SET(newfd, &conn);
-               }
-            }
-            else if (handle_data(fd)) {
-
-               if (verbose)
-                  printf("connection closed - fd %d\n", fd);
-               close(fd);
-               FD_CLR(fd, &conn);
-            }
-         }
-         else if (FD_ISSET(fd, &except)) {
             if (verbose)
-               printf("connection aborted - fd %d\n", fd);
+              printf("connection accepted - fd %d\n", newfd);
+            if (newfd < 0) {
+              perror("accept");
+            } else {
+              int flag = 1;
+              int optResult = setsockopt(newfd,
+                                         IPPROTO_TCP,
+                                         TCP_NODELAY,
+                                         (char *)&flag,
+                                         sizeof(int));
+              if (optResult < 0)
+                perror("TCP_NODELAY error");
+              if (newfd > maxfd) {
+                maxfd = newfd;
+              }
+              FD_SET(newfd, &conn);
+            }
+          }
+          else if (handle_data(fd)) {
+
+            if (verbose)
+              printf("connection closed - fd %d\n", fd);
             close(fd);
             FD_CLR(fd, &conn);
-            if (fd == s)
-               break;
-         }
+          }
+        }
+	else if (FD_ISSET(fd, &except)) {
+          if (verbose)
+            printf("connection aborted - fd %d\n", fd);
+          close(fd);
+          FD_CLR(fd, &conn);
+          if (fd == s)
+            break;
+	}
       }
-   }
-   return 0;
+    }
+    shutdown(s,SHUT_RDWR);
+  }
+  return 0;
 }
 
-/*
- * This work, "xvcpi.c", is a derivative of "xvcServer.c" (https://github.com/Xilinx/XilinxVirtualCable)
- * by Avnet and is used by Xilinx for XAPP1251.
- *
- * "xvcServer.c" is licensed under CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/)
- * by Avnet and is used by Xilinx for XAPP1251.
- *
- * "xvcServer.c", is a derivative of "xvcd.c" (https://github.com/tmbinc/xvcd)
- * by tmbinc, used under CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/).
- *
- * Portions of "xvcpi.c" are derived from OpenOCD (http://openocd.org)
- *
- * "xvcpi.c" is licensed under CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/)
- * by Derek Mulcahy.*
+   /*
+    * This work, "xvcpi.c", is a derivative of "xvcServer.c" (https://github.com/Xilinx/XilinxVirtualCable)
+    * by Avnet and is used by Xilinx for XAPP1251.
+    *
+    * "xvcServer.c" is licensed under CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/)
+    * by Avnet and is used by Xilinx for XAPP1251.
+    *
+    * "xvcServer.c", is a derivative of "xvcd.c" (https://github.com/tmbinc/xvcd)
+    * by tmbinc, used under CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/).
+    *
+    * Portions of "xvcpi.c" are derived from OpenOCD (http://openocd.org)
+    *
+    * "xvcpi.c" is licensed under CC0 1.0 Universal (http://creativecommons.org/publicdomain/zero/1.0/)
+    * by Derek Mulcahy.*
  */

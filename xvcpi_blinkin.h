@@ -6,6 +6,7 @@
 #define tdo_gpio 9
 #define TRSTn_gpio 7
 #define SRSTn_gpio 24
+#define vtarget_in_gpio 17
 #define i2c1_sda_gpio 2
 #define i2c1_scl_gpio 3
 #define vtarget_en_gpio 33
