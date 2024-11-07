@@ -1,7 +1,12 @@
 /*
+ ****************************************************************
  * Description :  Xilinx Virtual Cable Server for Raspberry Pi
  *
- * See Licensing information at End of File.
+ * See Licensing information at End of File
+ ****************************************************************
+ * This program restart the network interface everytime you unplug the cable and VTARGET = 0
+ * This require ad modded BINKIN LABS JTAG Hat or the SoCNoC JTAG Hat
+ * To make this program autostart on startup, add it to the /etc/rc.local file
  */
 
 
@@ -403,7 +408,7 @@ int main(int argc, char **argv) {
 
     while (read_vtarget_in()<1){
 	sleep(1);
-	printf("VTARGET : 0x%08x\n", read_vtarget_in());
+//	printf("VTARGET : 0x%08x\n", read_vtarget_in());
 	}
 
 
